@@ -34,7 +34,9 @@ export type Verdict = "genuine" | "inflated" | "fake" | "insufficient";
 
 export interface CheckResult {
   status: "ok";
-  mode: "link" | "manual";
+  mode: "link" | "manual" | "observed";
+  tracked_days?: number;
+  tracking_note?: string;
   product: { name: string | null; platform: string | null; category: string | null; product_id: string | null };
   mrp: number;
   sale_price: number;
@@ -105,6 +107,8 @@ export interface UploadReport {
 export const api = {
   checkLink: (url: string) =>
     request<CheckResult | NotFound>("/api/check/link", { method: "POST", body: JSON.stringify({ url }) }),
+  observe: (input: { url: string; price: number; mrp: number; advertised_pct?: number; name?: string; category?: string }) =>
+    request<CheckResult>("/api/check/observe", { method: "POST", body: JSON.stringify(input) }),
   checkManual: (input: ManualInput) =>
     request<CheckResult>("/api/check/manual", { method: "POST", body: JSON.stringify(input) }),
   impulse: (answers: Record<string, string>, consent: boolean) =>
@@ -124,4 +128,5 @@ export const api = {
     return request<UploadReport>(`/api/admin/upload/${kind}`, { method: "POST", body: fd }, t);
   },
   exportChecks: (t: string) => request<Blob>("/api/admin/export", {}, t),
+  exportPrices: (t: string, source: "all" | "observed") => request<Blob>(`/api/admin/export/prices?source=${source}`, {}, t),
 };

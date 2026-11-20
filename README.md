@@ -22,11 +22,38 @@ The full concept, design system and build specification are in [docs/DealCheck_W
 | Page | Purpose |
 |---|---|
 | **Home** `/` | Paste a product link and get an answer |
-| **Check Discount** `/check` | Link mode or manual entry. Shows the verdict, the numbers, a 90-day price chart and "Buy now or wait?" |
+| **Check Discount** `/check` | Link mode, manual entry, or prices sent by the DealCheck button. Shows the verdict, the numbers, a 90-day price chart and "Buy now or wait?" |
+| **Get the button** `/button` | A bookmark button that reads the price and MRP from the Amazon.in / Flipkart / Myntra page you are viewing |
 | **Impulse Quiz** `/quiz` | 10 questions. The ML model gives an impulse score (0–100) and the top 3 reasons |
 | **Learn** `/learn` | 8 dark patterns, anchoring, and how to complain (helpline 1915) |
 | **About** `/about` | Team, method, POME concepts, limitations |
 | **Admin** `/admin` | Password-protected: analytics, CSV upload, retrain or activate models, export |
+
+### How real products get prices: the DealCheck button
+
+The website does **not** scrape shopping sites (that breaks their terms and gets blocked). Instead:
+
+1. Open `/button` and drag **"DealCheck it"** to your bookmarks bar. On phones, copy the code into a bookmark.
+2. On any Amazon.in, Flipkart or Myntra product page, click it. In your own browser it reads the product name, selling price and crossed-out MRP. It reads Amazon's price block, Myntra's page data, the page's structured product data, or the visible crossed-out price.
+3. DealCheck opens with those values. Correct anything that's wrong and press **Check & save price**.
+4. That price is saved as today's price for the product (`source = observed`). With prices on **5 or more days in the last 30**, the product gets a full verdict, and a plain link check works too.
+
+**Team workflow for the study dataset:** check your ~200 study products with the button once a day. Then download them from **Admin → Export → Button prices only**. The CSV is in the same format the upload accepts.
+
+**What the button handles:**
+- **Unavailable items:** pages marked "Currently unavailable" are flagged instead of guessed.
+- **Other products:** on Amazon, prices inside links to other products (carousels, sponsored items) are ignored.
+- **Typos:** a price wildly different from the recorded usual price (under 0.3× or over 3×) is rejected as a likely typo.
+
+The button is built for the address the website runs on. Run locally, it points to `localhost`; after deployment, re-add it from the live site's `/button` page.
+
+Price reading was checked on live product pages (November 2026):
+- **Amazon.in:** price, MRP and % read correctly.
+- **Flipkart:** price and crossed-out MRP read correctly.
+- **Myntra:** price and MRP read correctly.
+- **Unavailable Amazon item:** correctly flagged.
+
+Shops change their page layouts, so the confirm screen always lets the shopper fix the numbers.
 
 ### The formula
 
@@ -88,10 +115,11 @@ npm run dev            # http://localhost:5173  (calls to /api are forwarded to 
 .venv/bin/python -m pytest
 ```
 
-There are 36 tests:
+There are 41 tests:
 - **Formula:** the four worked examples from the specification, the threshold boundaries, the 30-day window, confidence levels and the wording of explanations.
 - **Links:** Amazon, Flipkart and Myntra link parsing, including invalid links.
 - **API:** every endpoint, consent handling, admin authentication, CSV validation, retraining and activation.
+- **Button flow:** saving observed prices, same-day updates, history building into a verdict, typo guard, and price export.
 
 ### Demo product links (synthetic data)
 | Verdict | Link |
@@ -159,12 +187,14 @@ dealcheck/
 |---|---|---|
 | POST | `/api/check/link` | `{url}` → result, or `{status: "not_found"}` |
 | POST | `/api/check/manual` | `{mrp, sale_price, advertised_pct?, platform, category, past_prices[]}` |
+| POST | `/api/check/observe` | `{url, price, mrp, advertised_pct?, name?, category?}`: price read by the button; saved as today's price (20 per minute per IP) |
 | POST | `/api/impulse` | `{q1…q10, consent}` → `{score, level, advice, reasons}` |
 | GET | `/api/learn`, `/api/meta`, `/api/health` | public |
 | POST | `/api/admin/login` | `{password}` → token (2 h). Limited to 5 tries per minute |
 | POST | `/api/admin/upload/prices`, `/api/admin/upload/survey` | CSV, max 10 MB |
 | POST | `/api/admin/retrain`, `/api/admin/activate-model` | a new model is used only after you activate it |
 | GET | `/api/admin/models`, `/api/admin/analytics`, `/api/admin/export` | |
+| GET | `/api/admin/export/prices?source=observed\|all` | price dataset CSV (same format as the upload) |
 
 Errors always come back as `{"error": "message"}` with the matching HTTP status. Interactive API docs are at http://localhost:8000/docs.
 
@@ -191,7 +221,8 @@ Errors always come back as `{"error": "message"}` with the matching HTTP status.
    - Add a rewrite of `/*` to `/index.html` so page links work on refresh.
 
 ## Limitations (stated openly)
-- **Data source:** price data comes from our own collected dataset and from user entry. There is no live price feed.
+- **Data source:** price data comes from the DealCheck button, the team's collected dataset and user entry. There is no automatic live price feed, so a brand-new product needs a few days of button checks before it gets a verdict.
+- **Button accuracy:** the button depends on each shop's page layout, which can change. The shopper confirms or corrects the numbers before saving.
 - **New products:** a product we haven't tracked shows "Not enough data" and falls back to manual mode.
 - **Variants and sellers:** different variants or sellers can have different prices. Prices are tracked per platform product ID.
 - **Thresholds:** the DDI cut-offs (5 and 15) are a starting point, to be tuned from the real dataset's DDI distribution.

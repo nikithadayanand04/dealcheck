@@ -12,6 +12,7 @@ const Quiz = lazy(() => import("./pages/Quiz"));
 const Learn = lazy(() => import("./pages/Learn"));
 const About = lazy(() => import("./pages/About"));
 const Admin = lazy(() => import("./pages/Admin"));
+const ButtonPage = lazy(() => import("./pages/ButtonPage"));
 
 const Loading = () => (
   <Container className="py-20" >
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="quiz" element={<Suspense fallback={<Loading />}><Quiz /></Suspense>} />
           <Route path="learn" element={<Suspense fallback={<Loading />}><Learn /></Suspense>} />
           <Route path="about" element={<Suspense fallback={<Loading />}><About /></Suspense>} />
+          <Route path="button" element={<Suspense fallback={<Loading />}><ButtonPage /></Suspense>} />
           <Route path="admin" element={<Suspense fallback={<Loading />}><Admin /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Route>

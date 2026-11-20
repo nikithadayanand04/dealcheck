@@ -60,7 +60,7 @@ function ChartTooltip({ active, payload }: any) {
 
 export function PriceChart({ r }: { r: CheckResult }) {
   if (r.history.length < 2) {
-    return <p className="text-[15px] text-muted">Not enough past prices to draw a chart. Add a few past prices to see the trend.</p>;
+    return <p className="text-[15px] text-muted">No earlier prices yet, so there is no trend to draw. The chart appears once this product has prices on more than one day.</p>;
   }
   const prices = r.history.map((h) => h.price);
   const lo = Math.min(...prices, r.m30 ?? Infinity), hi = Math.max(...prices, r.m30 ?? 0);
@@ -165,6 +165,13 @@ export function ResultView({ r }: { r: CheckResult }) {
           )}
         </Card>
       </div>
+
+      {r.mode === "observed" && r.tracking_note && (
+        <div role="status" className="flex items-start gap-3 rounded-[10px] border border-glacier/40 bg-raised px-4 py-3 text-[15px] text-charcoal">
+          <span aria-hidden className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-glacier text-xs font-bold text-ivory tabular">{r.tracked_days}</span>
+          <span><span className="font-semibold text-ink">{r.tracked_days} day{r.tracked_days === 1 ? "" : "s"} of real prices recorded.</span> {r.tracking_note}</span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted">

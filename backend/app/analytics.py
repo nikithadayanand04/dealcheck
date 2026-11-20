@@ -81,7 +81,11 @@ def compute(db: Session) -> dict:
     verdict_rows = db.execute(select(Check.verdict, func.count(Check.id)).group_by(Check.verdict)).all()
     scores = [s for (s,) in db.execute(select(ImpulseResponse.impulse_score)).all()]
     hist = np.histogram(scores, bins=10, range=(0, 100))[0].tolist() if scores else [0] * 10
+    obs_rows = db.scalar(select(func.count(PriceHistory.id)).where(PriceHistory.source == "observed")) or 0
+    obs_products = db.scalar(select(func.count(func.distinct(PriceHistory.product_id))).where(PriceHistory.source == "observed")) or 0
     usage = {
+        "observed_prices": int(obs_rows),
+        "observed_products": int(obs_products),
         "total_checks": int(checks_total),
         "check_verdicts": [{"name": v, "count": int(c)} for v, c in verdict_rows],
         "impulse_responses": len(scores),

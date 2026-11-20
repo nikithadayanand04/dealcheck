@@ -45,6 +45,22 @@ class ManualCheck(BaseModel):
         return self
 
 
+class ObserveCheck(BaseModel):
+    """Prices read from a product page by the browser button and confirmed by the shopper."""
+    url: str = Field(min_length=1, max_length=2000)
+    price: float = Field(gt=0, le=config.MAX_PRICE)
+    mrp: float = Field(gt=0, le=config.MAX_PRICE)
+    advertised_pct: Optional[float] = Field(default=None, ge=0, le=99)
+    name: Optional[str] = Field(default=None, max_length=300)
+    category: Optional[Category] = None
+
+    @model_validator(mode="after")
+    def check_prices(self):
+        if self.price > self.mrp:
+            raise ValueError("Price can't be higher than MRP")
+        return self
+
+
 YesNo = Literal["yes", "no"]
 
 

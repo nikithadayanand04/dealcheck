@@ -21,6 +21,7 @@ const NAV = [
   { to: "/", label: "Home", end: true },
   { to: "/check", label: "Check Discount" },
   { to: "/quiz", label: "Impulse Quiz" },
+  { to: "/button", label: "Get the button" },
   { to: "/learn", label: "Learn" },
   { to: "/about", label: "About" },
 ];

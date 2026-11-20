@@ -109,7 +109,7 @@ function Overview({ token, onAuthFail }: { token: string; onAuthFail: () => void
   return (
     <div className="space-y-8">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Total checks" value={String(u.total_checks)} note="Done on the website" />
+        <Stat label="Total checks" value={String(u.total_checks)} note={`${u.observed_prices} real prices collected by the button (${u.observed_products} products)`} />
         <Stat label="Average DDI" value={d.avg_ddi != null ? d.avg_ddi.toFixed(1) : "—"} note={`${d.rows?.toLocaleString("en-IN") ?? 0} product-days in dataset`} />
         <Stat label="Misleading" value={d.pct_fake != null ? `${d.pct_fake.toFixed(1)}%` : "—"} note="Share of product-days with DDI > 15" />
         <Stat label="Avg impulse score" value={u.avg_impulse_score != null ? String(Math.round(u.avg_impulse_score)) : "—"} note={`${u.impulse_responses} consented responses`} />
@@ -340,6 +340,17 @@ export default function Admin() {
 
   if (!token) return <Login onToken={setToken} />;
 
+  async function download(fetcher: () => Promise<Blob>, base: string) {
+    try {
+      const blob = await fetcher();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${base}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { e instanceof ApiError && e.status === 401 ? authFail() : toast.error((e as Error).message); }
+  }
+
   async function exportCsv() {
     try {
       const blob = await api.exportChecks(token!);
@@ -378,11 +389,21 @@ export default function Admin() {
           )}
           {tab === "models" && <Models token={token} onAuthFail={authFail} />}
           {tab === "export" && (
-            <Card className="p-8">
-              <h2 className="text-xl">Export website checks</h2>
-              <p className="mt-2 max-w-[60ch] text-[15px] text-muted">Download every discount check (no personal data) as a CSV for your research report.</p>
-              <Button className="mt-6" onClick={exportCsv}><Download className="size-4" aria-hidden /> Download CSV</Button>
-            </Card>
+            <div className="grid gap-5 xl:grid-cols-2">
+              <Card className="p-8">
+                <h2 className="text-xl">Collected price data</h2>
+                <p className="mt-2 max-w-[60ch] text-[15px] text-muted">Real prices saved with the DealCheck button, in the same CSV format the upload accepts. This is your study dataset.</p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Button onClick={() => download(() => api.exportPrices(token!, "observed"), "dealcheck_prices_observed")}><Download className="size-4" aria-hidden /> Button prices only</Button>
+                  <Button variant="secondary" onClick={() => download(() => api.exportPrices(token!, "all"), "dealcheck_prices_all")}>All prices</Button>
+                </div>
+              </Card>
+              <Card className="p-8">
+                <h2 className="text-xl">Website checks</h2>
+                <p className="mt-2 max-w-[60ch] text-[15px] text-muted">Every discount check done on the site (no personal data), for your research report.</p>
+                <Button className="mt-6" onClick={exportCsv}><Download className="size-4" aria-hidden /> Download CSV</Button>
+              </Card>
+            </div>
           )}
         </div>
       </div>

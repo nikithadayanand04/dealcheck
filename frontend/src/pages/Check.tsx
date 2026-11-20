@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { api, ApiError, type CheckResult, type ManualInput } from "../lib/api";
 import { CATEGORIES, cn, PLATFORM_LABEL, PLATFORMS, todayISO } from "../lib/utils";
 import { Button, Card, Container, Eyebrow, FieldError, Input, Label, Notice, Select } from "../components/ui";
 import { ResultSkeleton, ResultView } from "../components/Result";
+import { ObserveConfirm, type ObserveInput } from "../components/ObserveConfirm";
+import { decodeObservation } from "../lib/bookmarklet";
 
 type Mode = "link" | "manual";
 type Row = { key: number; date: string; price: string };
@@ -51,6 +53,9 @@ export default function Check() {
   const resultRef = useRef<HTMLDivElement>(null);
   const nextKey = useRef(1);
   const autoRan = useRef(false);
+  const obsParam = params.get("obs");
+  const obs = useMemo(() => (obsParam ? decodeObservation(obsParam) : null), [obsParam]);
+  const [obsDone, setObsDone] = useState(false);
 
   const scrollToResult = () => setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 
@@ -76,6 +81,18 @@ export default function Check() {
     if (u && !autoRan.current) { autoRan.current = true; runLink(u); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function onObserve(v: ObserveInput) {
+    setServerError(""); setResult(null); setLoading(true); scrollToResult();
+    try { setResult(await api.observe(v)); setObsDone(true); }
+    catch (e) { setServerError((e as Error).message); }
+    finally { setLoading(false); }
+  }
+
+  function discardObservation() {
+    setObsDone(false); setResult(null); setServerError("");
+    setParams({}, { replace: true });
+  }
 
   function onLink(e: FormEvent) {
     e.preventDefault();
@@ -129,6 +146,15 @@ export default function Check() {
         </p>
       </div>
 
+      {obsParam && !obs && (
+        <Notice tone="error" className="mt-10">The button data couldn't be read. Please click the button on the product page again.</Notice>
+      )}
+      {obs && !obsDone && <ObserveConfirm obs={obs} loading={loading} onSubmit={onObserve} onDiscard={discardObservation} />}
+      {obs && obsDone && (
+        <p className="mt-8 text-sm text-muted">Want to check something else? <button onClick={discardObservation} className="text-lemon underline underline-offset-4 cursor-pointer">Start a new check</button></p>
+      )}
+
+      {!obsParam && <>
       {/* Mode switch */}
       <div role="tablist" aria-label="How do you want to check?" className="mt-10 inline-flex rounded-sm border border-hairline bg-surface p-1">
         {(["link", "manual"] as Mode[]).map((m) => (
@@ -159,7 +185,9 @@ export default function Check() {
             {notFound && (
               <Notice className="mb-6">
                 {notFound}
-                {manual.productId && <span className="mt-1 block text-sm text-muted">Product {manual.productId} on {PLATFORM_LABEL[manual.platform]} has been added to our tracking list.</span>}
+                <span className="mt-1 block text-sm text-muted">
+                  Tip: open the product page and click the <Link to="/button" className="text-lemon underline underline-offset-4">DealCheck button</Link>. It reads the price for you and starts building this product's price history.
+                </span>
               </Notice>
             )}
             <div className="grid gap-5 sm:grid-cols-2">
@@ -237,6 +265,8 @@ export default function Check() {
           </form>
         )}
       </Card>
+
+      </>}
 
       <div ref={resultRef} className="mt-14 scroll-mt-24">
         {serverError && <Notice tone="error">{serverError}</Notice>}

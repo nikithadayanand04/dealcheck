@@ -26,7 +26,7 @@ from .database import Check, ImpulseResponse, ModelVersion, PriceHistory, Produc
 from .ddi import analyse
 from .features import QUESTIONS, impulse_level
 from .importers import import_prices, import_survey
-from .schemas import ActivateRequest, AdminLogin, ImpulseAnswers, LinkCheck, ManualCheck, RetrainRequest
+from .schemas import ActivateRequest, AdminLogin, ImpulseAnswers, LinkCheck, ManualCheck, ObserveCheck, RetrainRequest
 from .urls import LinkError, normalise_product_id, parse_product_url
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -134,7 +134,7 @@ def check_link(body: LinkCheck, db: Session = Depends(get_db)):
             db.add(Product(platform=platform, platform_product_id=ppid))   # add to tracking list
             db.commit()
         return {"status": "not_found", "platform": platform, "product_id": ppid,
-                "message": "We don't have enough price history for this product yet. Enter the prices you see to get an estimate."}
+                "message": "We haven't tracked this product yet, so there's no price history. Enter the prices you see below for an estimate."}
     ref_date, sale_price = hist[-1]
     return _build_result(db, mode="link", mrp=product.mrp, sale_price=sale_price, history=hist[:-1], ref_date=ref_date,
                          product=product, name=product.name, platform=platform, category=product.category)
@@ -162,6 +162,57 @@ def check_manual(body: ManualCheck, db: Session = Depends(get_db)):
     return _build_result(db, mode="manual", mrp=body.mrp, sale_price=body.sale_price, history=sorted(history.items()),
                          ref_date=today, advertised_pct=body.advertised_pct, product=product,
                          name=body.name or (product.name if product else None), platform=body.platform, category=body.category)
+
+
+@app.post("/api/check/observe")
+@limiter.limit("20/minute")
+def check_observe(request: Request, body: ObserveCheck, db: Session = Depends(get_db)):
+    """A price read from the product page by the DealCheck browser button and confirmed by the shopper.
+    It is saved as today's price for that product (source "observed"), so real history builds up over time."""
+    try:
+        platform, ppid = parse_product_url(body.url)
+    except LinkError as e:
+        raise HTTPException(400, str(e))
+    today = date.today()
+    product = db.scalar(select(Product).where(Product.platform == platform, Product.platform_product_id == ppid))
+    if product is None:
+        product = Product(platform=platform, platform_product_id=ppid)
+        db.add(product)
+        db.flush()
+    past = [(d, p) for d, p in _history(db, product.id) if d < today]
+
+    # typo / tampering guard: a price wildly different from what we've recorded is probably a mistake
+    recent = [p for d, p in past if d >= today - timedelta(days=config.CONTEXT_DAYS)]
+    if recent:
+        med = sorted(recent)[len(recent) // 2]
+        if not (0.3 * med <= body.price <= 3 * med):
+            raise HTTPException(422, f"That price is very different from the ₹{med:,.0f} we usually record for this product. Please double-check it.")
+
+    if body.name:
+        product.name = body.name.strip()[:300]
+    product.category = body.category or product.category or "Others"
+    product.mrp = body.mrp
+    todays = db.scalar(select(PriceHistory).where(PriceHistory.product_id == product.id, PriceHistory.date == today))
+    if todays is None:
+        db.add(PriceHistory(product_id=product.id, date=today, price=body.price, source="observed"))
+    elif todays.source == "observed":
+        todays.price = body.price          # latest confirmation of the day wins; dataset rows are never overwritten
+    db.flush()
+
+    res = _build_result(db, mode="observed", mrp=body.mrp, sale_price=body.price, history=past, ref_date=today,
+                        advertised_pct=body.advertised_pct, product=product, name=product.name,
+                        platform=platform, category=product.category)
+    res["tracked_days"] = len(past) + 1
+    if res["m30"] is None:
+        res["explanation"] = (
+            f"This is the first price we've recorded for this product in the last 30 days. The banner says "
+            f"{res['advertised_discount']}% off, but to know whether that's real we need the product's usual price. "
+            "Check it again with the DealCheck button on a few more days.")
+    res["tracking_note"] = (
+        "Saved. Each day someone checks this product with the DealCheck button, its price history grows. "
+        f"A confident verdict needs prices on at least {config.MIN_POINTS} days in the last 30."
+        if res["verdict"] == "insufficient" else "Saved to this product's price history.")
+    return res
 
 
 @app.post("/api/impulse")
@@ -293,3 +344,21 @@ def export(db: Session = Depends(get_db)):
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=dealcheck_checks.csv"})
+
+
+@app.get("/api/admin/export/prices", dependencies=[Depends(require_admin)])
+def export_prices(source: str = "all", db: Session = Depends(get_db)):
+    """Price dataset as CSV in the same format the upload accepts. source = all | observed | dataset."""
+    q = (select(Product.platform_product_id, Product.platform, Product.name, Product.category, Product.mrp,
+                PriceHistory.date, PriceHistory.price, PriceHistory.source)
+         .join(Product, Product.id == PriceHistory.product_id).order_by(Product.id, PriceHistory.date))
+    if source in ("observed", "dataset", "synthetic"):
+        q = q.where(PriceHistory.source == source)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["product_id", "platform", "name", "category", "mrp", "date", "price", "source"])
+    for row in db.execute(q):
+        w.writerow([row[0], row[1], row[2] or "", row[3] or "Others", row[4], row[5].isoformat(), row[6], row[7]])
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": f"attachment; filename=dealcheck_prices_{source}.csv"})
