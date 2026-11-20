@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* DealCheck design tokens: navy, glacier blue and lemon.
+   Token names are semantic: "ivory" = page background, "ink" = strongest text. */
+@theme {
+  --color-ivory: #0B1A33;        /* navy: page background */
+  --color-deep: #071228;         /* deepest navy: footer, ticker */
+  --color-surface: #12264A;      /* cards */
+  --color-raised: #193260;       /* selected / hover tint */
+  --color-ink: #E6F4FA;          /* icy white-blue: headings, key numbers (15.5:1) */
+  --color-charcoal: #C3DCE8;     /* body text (12.2:1) */
+  --color-muted: #93B3C8;        /* captions (7.9:1) */
+  --color-silver-soft: #A9D6EA;  /* glacier blue: secondary text on deep backgrounds */
+  --color-glacier: #7FC4E0;      /* glacier blue: lines, icons, chart strokes (9:1) */
+  --color-hairline: #24406E;     /* borders */
+  --color-lemon: #F4E04D;     /* lemon highlight: primary buttons, sparkles, key words (12.9:1) */
+  --color-lemon-hover: #FFEB6B;
+  --color-lemon-deep: #5E5300; /* olive-lemon text on the icy band (6.9:1) */
+  --color-genuine: #6EE7B7;
+  --color-inflated: #FDBA74;
+  --color-inflated-text: #FDBA74;
+  --color-fake: #FCA5A5;
+  --color-insufficient: #A3B4C6;
+
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+
+  --animate-fade-up: fade-up 500ms cubic-bezier(.2,.7,.2,1) both;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-slow: float 9s ease-in-out infinite;
+  --animate-swing: swing 5s ease-in-out infinite;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-spin-slow: spin 30s linear infinite;
+  --animate-stamp: stamp 600ms cubic-bezier(.2,1.4,.4,1) both;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-twinkle: twinkle 3s ease-in-out infinite;
+
+  @keyframes fade-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+  @keyframes swing { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes stamp { 0% { opacity: 0; transform: scale(1.6) rotate(-8deg); } 100% { opacity: 1; transform: scale(1) rotate(-6deg); } }
+  @keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+  @keyframes twinkle { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.1); } }
+}
+
+@layer base {
+  html { background: var(--color-ivory); color: var(--color-charcoal); color-scheme: dark; }
+  body { font-family: var(--font-sans); font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, h4 { font-family: var(--font-serif); color: var(--color-ink); font-weight: 600; line-height: 1.15; font-variant-numeric: lining-nums; }
+  .font-serif { font-variant-numeric: lining-nums; }
+  ::selection { background: var(--color-lemon); color: var(--color-ivory); }
+  :focus-visible { outline: 2px solid var(--color-lemon); outline-offset: 2px; border-radius: 4px; }
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.85); }
+  ::placeholder { color: #7F9BB3; }
+}
+
+.tabular { font-variant-numeric: lining-nums tabular-nums; }
+
+/* Subtle dotted texture used behind sections */
+.bg-dots {
+  background-image: radial-gradient(rgba(169, 214, 234, 0.10) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+/* Soft glows */
+.glow-lemon { background: radial-gradient(closest-side, rgba(244, 224, 77, 0.28), transparent); }
+.glow-silver { background: radial-gradient(closest-side, rgba(169, 214, 234, 0.12), transparent); }
+.glow-glacier { background: radial-gradient(closest-side, rgba(127, 196, 224, 0.22), transparent); }
+
+/* Shimmering lemon text */
+.text-shimmer {
+  background: linear-gradient(90deg, #F4E04D 0%, #FFF7B0 25%, #F4E04D 50%, #FFF7B0 75%, #F4E04D 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+/* Line-drawing animation for SVG paths: set --len to the path length */
+.draw { stroke-dasharray: var(--len, 1000); stroke-dashoffset: var(--len, 1000); animation: draw 2.2s cubic-bezier(.6,0,.2,1) forwards; animation-delay: var(--delay, 0s); }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* Scroll reveal */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); transition-delay: var(--reveal-delay, 0ms); }
+.reveal.is-visible { opacity: 1; transform: none; }
+
+/* Card hover lift with lemon edge */
+.lift { transition: transform .3s ease, border-color .3s ease, box-shadow .3s ease; }
+.lift:hover { transform: translateY(-4px); border-color: rgba(244, 224, 77, .55); box-shadow: 0 18px 40px -18px rgba(0,0,0,.6), 0 0 0 1px rgba(244,224,77,.15); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  .reveal { opacity: 1; transform: none; }
+  .draw { stroke-dashoffset: 0; }
+}

@@ -1,0 +1,12 @@
+{
+  "_note": "Approximate start dates (MM-DD) and lengths of major Indian online sale events. Dates move every year: update them before each academic year.",
+  "events": [
+    {"name": "Republic Day Sale", "start": "01-17", "days": 6},
+    {"name": "Holi Sale", "start": "03-08", "days": 4},
+    {"name": "Independence Day Sale", "start": "08-06", "days": 6},
+    {"name": "Great Indian Festival / Big Billion Days", "start": "09-26", "days": 10},
+    {"name": "Diwali Sale", "start": "10-20", "days": 7},
+    {"name": "Black Friday Sale", "start": "11-24", "days": 4},
+    {"name": "Year-End Sale", "start": "12-20", "days": 10}
+  ]
+}
